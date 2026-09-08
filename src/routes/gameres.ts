@@ -25,8 +25,7 @@ const getList = async (noCache: boolean) => {
   const result = await get<string>({ url, noCache });
   const $ = load(result.data);
 
-  const container = $('div[data-news-pane-id="100000"]');
-  const listDom = container.find("article.feed-item");
+  const listDom = $("article.feed-item");
 
   const listData = Array.from(listDom).map((el) => {
     const dom = $(el);
@@ -37,7 +36,7 @@ const getList = async (noCache: boolean) => {
     const href = titleEl.attr("href");
     const url = href?.startsWith("http") ? href : `https://www.gameres.com${href ?? ""}`;
 
-    const cover = dom.find(".thumb").attr("data-original") || "";
+    const cover = dom.find(".thumb").attr("data-original") || dom.find("img").attr("src") || "";
     const desc = dom.find(".feed-item-right > p").first().text().trim();
 
     const dateTime = dom.find(".mark-info").contents().first().text().trim();
