@@ -6,7 +6,8 @@ import { getCache, setCache } from "../utils/cache.js";
 import { getDyCookies } from "./douyin.js";
 import logger from "../utils/logger.js";
 
-const CACHE_KEY = "douyin-parenting-data";
+// v2：条目带 kind 分组（spot/topic），版本化以令旧缓存立即失效
+const CACHE_KEY = "douyin-parenting-data-v2";
 const PARENTING_REGEX = /(育儿|亲子|宝宝|宝妈|孕妇|儿童|孩子|产后|带娃|母婴|少儿|幼师|幼儿园)/i;
 
 /**
