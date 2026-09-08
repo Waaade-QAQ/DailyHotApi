@@ -9,23 +9,41 @@ import logger from "../utils/logger.js";
 const CACHE_KEY = "douyin-parenting-data";
 const PARENTING_REGEX = /(育儿|亲子|宝宝|宝妈|孕妇|儿童|孩子|产后|带娃|母婴|少儿|幼师|幼儿园)/i;
 
-interface TikHubItem {
+/**
+ * 创作热点（hot_spot）榜单条目原始结构（字段均可选，缺失时按 undefined 处理）
+ */
+interface TikHubSpotItem {
   query_id?: string;
   sentence_id?: string;
-  item_id?: string | number;
-  word?: string;
   title?: string;
+  word?: string;
   hot_value?: number;
   hot_score?: number;
+  category?: string;
+  rank_diff?: number;
+  cover?: { url_list?: string[] };
+  aweme_list?: Array<{ aweme_id?: string | number }>;
+}
+
+/**
+ * 亲子话题（hot_topic）榜单条目原始结构
+ */
+interface TikHubTopicItem {
+  item_id?: string | number;
+  query_id?: string;
+  title?: string;
+  word?: string;
   play_count?: number;
+  hot_score?: number;
   event_time?: string | number;
 }
 
-interface TikHubResponse {
-  data?: {
-    item_list?: TikHubItem[];
-    billboard_list?: TikHubItem[];
-  };
+interface TikHubSpotResponse {
+  data?: { item_list?: TikHubSpotItem[]; billboard_list?: TikHubSpotItem[] };
+}
+
+interface TikHubTopicResponse {
+  data?: { item_list?: TikHubTopicItem[]; billboard_list?: TikHubTopicItem[] };
 }
 
 interface PublicWordItem {
@@ -37,59 +55,78 @@ interface PublicWordItem {
 }
 
 interface PublicHotResponse {
-  data: {
-    word_list: PublicWordItem[];
-  };
+  data: { word_list: PublicWordItem[] };
 }
+
+const searchUrl = (keyword: string) =>
+  `https://www.douyin.com/search/${encodeURIComponent(keyword)}?type=general`;
 
 const fetchSpotsFromTikHub = async (): Promise<ListItem[]> => {
   if (!config.TIKHUB_API_KEY) return [];
+  // billboard_tag=19000 为「母婴亲子」领域创作热点；hot_search_type=3 为热点上升榜
   const url =
     "https://api.tikhub.io/api/v1/douyin/creator/fetch_creator_hot_spot_billboard?billboard_tag=19000&hot_search_type=3";
-  const result = await get<TikHubResponse>({
+  const result = await get<TikHubSpotResponse>({
     url,
     headers: { Authorization: `Bearer ${config.TIKHUB_API_KEY}` },
     noCache: true,
   });
   const raw = result.data?.data;
   const list = raw?.item_list || raw?.billboard_list || [];
-  return list.map((v, i) => {
+  return list.map((v, i): ListItem => {
     const id = v.query_id || v.sentence_id || `${i + 1}`;
     const title = v.word || v.title || `热点 ${i + 1}`;
     const hot = v.hot_value ?? v.hot_score ?? 0;
+    const videoId = v.aweme_list?.find((a) => a.aweme_id)?.aweme_id;
+    const isVideo = videoId !== undefined && videoId !== null;
     return {
       id,
       title,
       hot,
-      timestamp: v.event_time ? getTime(v.event_time) : undefined,
-      url: `https://www.douyin.com/search/${encodeURIComponent(title)}`,
-      mobileUrl: `https://www.douyin.com/search/${encodeURIComponent(title)}`,
+      kind: "spot",
+      category: v.category,
+      cover: v.cover?.url_list?.[0],
+      timestamp: undefined,
+      // 词条若带具体视频则直达视频页，否则落抖音搜索
+      url: isVideo
+        ? `https://www.douyin.com/video/${videoId}`
+        : searchUrl(title),
+      mobileUrl: isVideo
+        ? `snssdk1128://aweme/detail/${videoId}`
+        : searchUrl(title),
     };
   });
 };
 
 const fetchTopicsFromTikHub = async (): Promise<ListItem[]> => {
   if (!config.TIKHUB_API_KEY) return [];
+  // billboard_tag=315 官方领域名为「亲子」；order_key=1 播放最高、time_filter=1 近 24 小时
   const url =
     "https://api.tikhub.io/api/v1/douyin/creator/fetch_creator_hot_topic_billboard?billboard_tag=315&order_key=1&time_filter=1";
-  const result = await get<TikHubResponse>({
+  const result = await get<TikHubTopicResponse>({
     url,
     headers: { Authorization: `Bearer ${config.TIKHUB_API_KEY}` },
     noCache: true,
   });
   const raw = result.data?.data;
   const list = raw?.item_list || raw?.billboard_list || [];
-  return list.map((v, i) => {
+  return list.map((v, i): ListItem => {
     const id = v.item_id !== undefined ? String(v.item_id) : (v.query_id || `${i + 1}`);
     const title = v.title || v.word || `话题 ${i + 1}`;
     const hot = v.play_count ?? v.hot_score ?? 0;
+    const hashtagId = String(v.item_id ?? "");
+    const useHashtag = hashtagId.length >= 10;
     return {
       id,
       title,
       hot,
-      timestamp: undefined,
-      url: `https://www.douyin.com/search/${encodeURIComponent(title)}`,
-      mobileUrl: `https://www.douyin.com/search/${encodeURIComponent(title)}`,
+      kind: "topic",
+      timestamp: v.event_time ? getTime(v.event_time) : undefined,
+      // 话题条目直达官方话题聚合页 / 抖音 App 挑战详情
+      url: useHashtag ? `https://www.douyin.com/hashtag/${hashtagId}` : searchUrl(title),
+      mobileUrl: useHashtag
+        ? `snssdk1128://challenge/detail/${hashtagId}`
+        : searchUrl(title),
     };
   });
 };
@@ -134,13 +171,14 @@ const fetchFallbackList = async (): Promise<ListItem[]> => {
   );
   const targetList = filtered.length > 0 ? filtered : wordList.slice(0, 15);
 
-  return targetList.map((v) => ({
+  return targetList.map((v): ListItem => ({
     id: v.sentence_id,
     title: v.word,
     timestamp: getTime(v.event_time),
     hot: v.hot_value,
-    url: `https://www.douyin.com/search/${encodeURIComponent(v.word)}`,
-    mobileUrl: `https://www.douyin.com/search/${encodeURIComponent(v.word)}`,
+    kind: "spot",
+    url: searchUrl(v.word),
+    mobileUrl: searchUrl(v.word),
   }));
 };
 

@@ -15,6 +15,10 @@ export interface ListItem {
   timestamp: number | undefined;
   url: string;
   mobileUrl: string;
+  // douyin-parenting: 条目类型（创作热点词条 / 亲子话题）
+  kind?: "spot" | "topic";
+  // douyin-parenting: 创作热点所属领域分类（如「母婴」「亲子」）
+  category?: string;
 }
 
 // 路由接口数据
