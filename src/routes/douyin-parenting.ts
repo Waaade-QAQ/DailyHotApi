@@ -12,26 +12,19 @@ const PARENTING_REGEX = /(育儿|亲子|宝宝|宝妈|孕妇|儿童|孩子|产�
 interface TikHubItem {
   query_id?: string;
   sentence_id?: string;
-  id?: string | number;
+  item_id?: string | number;
   word?: string;
   title?: string;
   hot_value?: number;
   hot_score?: number;
+  play_count?: number;
   event_time?: string | number;
 }
 
 interface TikHubResponse {
-  code?: number;
-  msg?: string;
   data?: {
     item_list?: TikHubItem[];
     billboard_list?: TikHubItem[];
-    word_list?: TikHubItem[];
-    data?: {
-      item_list?: TikHubItem[];
-      billboard_list?: TikHubItem[];
-      word_list?: TikHubItem[];
-    };
   };
 }
 
@@ -49,53 +42,78 @@ interface PublicHotResponse {
   };
 }
 
-const fetchFromTikHub = async (): Promise<ListItem[]> => {
-  if (!config.TIKHUB_API_KEY) {
-    throw new Error("TIKHUB_API_KEY is not configured");
-  }
+const fetchSpotsFromTikHub = async (): Promise<ListItem[]> => {
+  if (!config.TIKHUB_API_KEY) return [];
   const url =
     "https://api.tikhub.io/api/v1/douyin/creator/fetch_creator_hot_spot_billboard?billboard_tag=19000&hot_search_type=3";
   const result = await get<TikHubResponse>({
     url,
-    headers: {
-      Authorization: `Bearer ${config.TIKHUB_API_KEY}`,
-    },
+    headers: { Authorization: `Bearer ${config.TIKHUB_API_KEY}` },
     noCache: true,
   });
-
-  const rawData = result.data?.data;
-  const list: TikHubItem[] =
-    rawData?.item_list ||
-    rawData?.billboard_list ||
-    rawData?.word_list ||
-    rawData?.data?.item_list ||
-    rawData?.data?.billboard_list ||
-    rawData?.data?.word_list ||
-    [];
-
-  if (list.length === 0) {
-    throw new Error("Empty list returned from TikHub");
-  }
-
-  return list.map((v, index) => {
-    const id =
-      v.query_id || v.sentence_id || (v.id !== undefined ? String(v.id) : `${index + 1}`);
-    const title = v.word || v.title || `热点 ${index + 1}`;
-    const hot =
-      typeof v.hot_value === "number"
-        ? v.hot_value
-        : typeof v.hot_score === "number"
-          ? v.hot_score
-          : 0;
+  const raw = result.data?.data;
+  const list = raw?.item_list || raw?.billboard_list || [];
+  return list.map((v, i) => {
+    const id = v.query_id || v.sentence_id || `${i + 1}`;
+    const title = v.word || v.title || `热点 ${i + 1}`;
+    const hot = v.hot_value ?? v.hot_score ?? 0;
     return {
       id,
       title,
       hot,
       timestamp: v.event_time ? getTime(v.event_time) : undefined,
-      url: `https://www.douyin.com/hot/${id}`,
-      mobileUrl: `https://www.douyin.com/hot/${id}`,
+      url: `https://www.douyin.com/search/${encodeURIComponent(title)}`,
+      mobileUrl: `https://www.douyin.com/search/${encodeURIComponent(title)}`,
     };
   });
+};
+
+const fetchTopicsFromTikHub = async (): Promise<ListItem[]> => {
+  if (!config.TIKHUB_API_KEY) return [];
+  const url =
+    "https://api.tikhub.io/api/v1/douyin/creator/fetch_creator_hot_topic_billboard?billboard_tag=315&order_key=1&time_filter=1";
+  const result = await get<TikHubResponse>({
+    url,
+    headers: { Authorization: `Bearer ${config.TIKHUB_API_KEY}` },
+    noCache: true,
+  });
+  const raw = result.data?.data;
+  const list = raw?.item_list || raw?.billboard_list || [];
+  return list.map((v, i) => {
+    const id = v.item_id !== undefined ? String(v.item_id) : (v.query_id || `${i + 1}`);
+    const title = v.title || v.word || `话题 ${i + 1}`;
+    const hot = v.play_count ?? v.hot_score ?? 0;
+    return {
+      id,
+      title,
+      hot,
+      timestamp: undefined,
+      url: `https://www.douyin.com/search/${encodeURIComponent(title)}`,
+      mobileUrl: `https://www.douyin.com/search/${encodeURIComponent(title)}`,
+    };
+  });
+};
+
+const fetchFromTikHub = async (): Promise<ListItem[]> => {
+  const [spotsRes, topicsRes] = await Promise.allSettled([
+    fetchSpotsFromTikHub(),
+    fetchTopicsFromTikHub(),
+  ]);
+  const spots = spotsRes.status === "fulfilled" ? spotsRes.value : [];
+  const topics = topicsRes.status === "fulfilled" ? topicsRes.value : [];
+
+  const seen = new Set<string>();
+  const combined: ListItem[] = [];
+  for (const item of [...spots, ...topics]) {
+    if (item.title && !seen.has(item.title)) {
+      seen.add(item.title);
+      combined.push(item);
+    }
+  }
+  if (combined.length === 0) {
+    throw new Error("No items returned from TikHub");
+  }
+  return combined;
 };
 
 const fetchFallbackList = async (): Promise<ListItem[]> => {
@@ -121,8 +139,8 @@ const fetchFallbackList = async (): Promise<ListItem[]> => {
     title: v.word,
     timestamp: getTime(v.event_time),
     hot: v.hot_value,
-    url: `https://www.douyin.com/hot/${v.sentence_id}`,
-    mobileUrl: `https://www.douyin.com/hot/${v.sentence_id}`,
+    url: `https://www.douyin.com/search/${encodeURIComponent(v.word)}`,
+    mobileUrl: `https://www.douyin.com/search/${encodeURIComponent(v.word)}`,
   }));
 };
 

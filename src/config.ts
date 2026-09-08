@@ -59,8 +59,6 @@ export const config: Config = {
   REDIS_DB:  getNumericEnvVariable("REDIS_DB", 0),
   ZHIHU_COOKIE: getEnvVariable("ZHIHU_COOKIE") || "",
   FILTER_WEIBO_ADVERTISEMENT: getBooleanEnvVariable("FILTER_WEIBO_ADVERTISEMENT", false),
-  TIKHUB_API_KEY:
-    getEnvVariable("TIKHUB_API_KEY") ||
-    "1pAQBMpO11CmiW3DAZ+u4RD6agnXfrpAzkTqj2+fTNOKqVuOCV6IZ2rPCQ==",
+  TIKHUB_API_KEY: getEnvVariable("TIKHUB_API_KEY") || "",
   DOUYIN_PARENTING_CACHE_TTL: getNumericEnvVariable("DOUYIN_PARENTING_CACHE_TTL", 3600),
 };
