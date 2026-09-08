@@ -1,6 +1,7 @@
 // 临时透传探针：验证抖音热榜接口的分类参数行为，验证完成后删除
 import type { Context } from "hono";
 import type { ListItem, RouterData } from "../types.js";
+import { getDyCookies } from "./douyin.js";
 
 interface ProbeItem extends ListItem {
   cookieOk: boolean;
@@ -9,22 +10,6 @@ interface ProbeItem extends ListItem {
   upstreamHeaders?: Record<string, string>;
   raw: unknown;
 }
-
-const getDyCookies = async (): Promise<string | undefined> => {
-  try {
-    const res = await fetch("https://www.douyin.com/passport/general/login_guiding_strategy/?aid=6383", {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-      },
-    });
-    const setCookie = res.headers.get("set-cookie") || "";
-    const match = setCookie.match(/passport_csrf_token=([^;]+)/);
-    return match?.[1];
-  } catch {
-    return undefined;
-  }
-};
 
 export const handleRoute = async (c: Context, _noCache: boolean): Promise<RouterData> => {
   const customUpstream = c.req.query("upstream_url");
@@ -54,6 +39,8 @@ export const handleRoute = async (c: Context, _noCache: boolean): Promise<Router
     }
     if (upstream.includes("creator.douyin.com")) {
       reqHeaders["Referer"] = "https://creator.douyin.com/creator-micro/home";
+    } else {
+      reqHeaders["Referer"] = "https://www.douyin.com/hot";
     }
 
     const res = await fetch(url, { headers: reqHeaders });

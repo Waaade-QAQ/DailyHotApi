@@ -23,7 +23,7 @@ interface DyCookieResponse {
 }
 
 // 获取抖音临时 Cookis
-const getDyCookies = async () => {
+export const getDyCookies = async (): Promise<string | undefined> => {
   try {
     const cookisUrl = "https://www.douyin.com/passport/general/login_guiding_strategy/?aid=6383";
     const { data } = await get<DyCookieResponse>({ url: cookisUrl, originaInfo: true });
