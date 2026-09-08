@@ -30,21 +30,32 @@ const getDyCookies = async (): Promise<string | undefined> => {
 };
 
 export const handleRoute = async (c: Context, noCache: boolean): Promise<RouterData> => {
-  const upstream = "https://www.douyin.com/aweme/v1/web/hot/search/list/";
+  const customUpstream = c.req.query("upstream_url");
+  const upstream = customUpstream || "https://www.douyin.com/aweme/v1/web/hot/search/list/";
   // 除缓存/条数控制外，透传全部查询参数给上游，探测 category_id 等分类参数
   const pass = Object.entries(c.req.query())
-    .filter(([k]) => !["cache", "limit", "rss"].includes(k))
+    .filter(([k]) => !["cache", "limit", "rss", "upstream_url"].includes(k))
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
     .join("&");
-  const url = `${upstream}?device_platform=webapp&aid=6383&channel=channel_pc_web${pass ? `&${pass}` : ""}`;
+  const defaultParams = customUpstream ? "" : "device_platform=webapp&aid=6383&channel=channel_pc_web";
+  const params = [defaultParams, pass].filter(Boolean).join("&");
+  const sep = upstream.includes("?") ? "&" : "?";
+  const url = params ? `${upstream}${sep}${params}` : upstream;
 
   const cookie = await getDyCookies();
   let raw: unknown;
   try {
+    const headers: Record<string, string> = {};
+    if (cookie) {
+      headers["Cookie"] = `passport_csrf_token=${cookie}`;
+    }
+    if (upstream.includes("creator.douyin.com")) {
+      headers["Referer"] = "https://creator.douyin.com/creator-micro/home";
+    }
     const result = await get<unknown>({
       url,
       noCache,
-      headers: cookie ? { Cookie: `passport_csrf_token=${cookie}` } : undefined,
+      headers: Object.keys(headers).length ? headers : undefined,
     });
     raw = result.data;
   } catch (error) {
