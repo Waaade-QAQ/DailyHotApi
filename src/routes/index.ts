@@ -11,7 +11,7 @@ import * as r_dgtle from "./dgtle.js";
 import * as r_douban_group from "./douban-group.js";
 import * as r_douban_movie from "./douban-movie.js";
 import * as r_douyin from "./douyin.js";
-import * as r_dyprobe from "./dyprobe.js";
+import * as r_douyin_parenting from "./douyin-parenting.js";
 import * as r_earthquake from "./earthquake.js";
 import * as r_gameres from "./gameres.js";
 import * as r_geekpark from "./geekpark.js";
@@ -70,7 +70,7 @@ export const routesMap: Record<string, any> = {
   "douban-group": r_douban_group,
   "douban-movie": r_douban_movie,
   "douyin": r_douyin,
-  "dyprobe": r_dyprobe,
+  "douyin-parenting": r_douyin_parenting,
   "earthquake": r_earthquake,
   "gameres": r_gameres,
   "geekpark": r_geekpark,
