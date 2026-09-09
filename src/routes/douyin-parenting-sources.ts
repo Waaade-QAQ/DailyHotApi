@@ -89,6 +89,7 @@ export const fetchOfficialSpotList = async (): Promise<ListItem[]> => {
     timestamp: getTime(v.event_time),
     hot: v.hot_value,
     kind: "spot",
+    source: "official",
     url: searchUrl(v.word),
     mobileUrl: searchUrl(v.word),
   }));
@@ -119,6 +120,7 @@ export const fetchSpotsFromTikHub = async (): Promise<ListItem[]> => {
       title,
       hot: v.hot_value ?? v.hot_score ?? 0,
       kind: "spot",
+      source: "creator",
       timestamp: undefined,
       url: searchUrl(title),
       mobileUrl: searchUrl(title),

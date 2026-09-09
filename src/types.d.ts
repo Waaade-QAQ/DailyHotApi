@@ -19,6 +19,8 @@ export interface ListItem {
   kind?: "spot" | "topic";
   // douyin-parenting: 创作热点所属领域分类（如「母婴」「亲子」）
   category?: string;
+  // douyin-parenting: spot 来源（official 官方实时热搜 / creator 创作者中心快照）
+  source?: "official" | "creator";
 }
 
 // 路由接口数据
