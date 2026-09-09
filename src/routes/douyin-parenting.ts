@@ -2,29 +2,23 @@ import type { RouterData, ListContext, RouterResType, ListItem } from "../types.
 import { config } from "../config.js";
 import { getCache, setCache } from "../utils/cache.js";
 import logger from "../utils/logger.js";
-import {
-  fetchOfficialSpotList,
-  fetchSpotsFromTikHub,
-  fetchTopicsFromTikHub,
-} from "./douyin-parenting-sources.js";
+import { fetchSpotsFromTikHub, fetchTopicsFromTikHub } from "./douyin-parenting-sources.js";
 
-// v3：亲子热点 = 官方实时热搜（免费）∪ TikHub 创作热点快照（保留原词条）；亲子话题 = TikHub 24h 播放榜
-const CACHE_KEY = "douyin-parenting-data-v3";
+// v4：仅使用 TikHub 官方亲子垂类接口（创作热点 billboard_tag=19000、话题 billboard_tag=315）
+const CACHE_KEY = "douyin-parenting-data-v4";
 
 const fetchFromDouyin = async (): Promise<ListItem[]> => {
-  const [officialRes, creatorRes, topicsRes] = await Promise.allSettled([
-    fetchOfficialSpotList(),
+  const [spotsRes, topicsRes] = await Promise.allSettled([
     fetchSpotsFromTikHub(),
     fetchTopicsFromTikHub(),
   ]);
-  const official = officialRes.status === "fulfilled" ? officialRes.value : [];
-  const creator = creatorRes.status === "fulfilled" ? creatorRes.value : [];
+  const spots = spotsRes.status === "fulfilled" ? spotsRes.value : [];
   const topics = topicsRes.status === "fulfilled" ? topicsRes.value : [];
 
-  // 顺序：官方实时热搜在前（日内可见变化），创作热点快照在后，话题最后；按标题去重
+  // 创作热点在前、话题在后，按标题去重
   const seen = new Set<string>();
   const combined: ListItem[] = [];
-  for (const item of [...official, ...creator, ...topics]) {
+  for (const item of [...spots, ...topics]) {
     if (item.title && !seen.has(item.title)) {
       seen.add(item.title);
       combined.push(item);
@@ -48,7 +42,7 @@ const getList = async (): Promise<RouterResType> => {
   }
 
   let data: ListItem[];
-  // 官方热搜更新快：整榜缓存收紧到 30 分钟，兼顾新鲜度与 TikHub 计费
+  // 整榜缓存 30 分钟，兼顾新鲜度与 TikHub 计费
   let ttl = Math.min(config.DOUYIN_PARENTING_CACHE_TTL, 1800);
 
   try {
@@ -56,8 +50,8 @@ const getList = async (): Promise<RouterResType> => {
     logger.info(`✅ [douyin-parenting] fetched ${data.length} items`);
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
-    logger.warn(`⚠️ [douyin-parenting] failed (${errMsg}), retrying official feed`);
-    data = await fetchOfficialSpotList();
+    logger.warn(`⚠️ [douyin-parenting] failed (${errMsg}), falling back to topics`);
+    data = await fetchTopicsFromTikHub();
     ttl = Math.min(ttl, 300);
   }
 

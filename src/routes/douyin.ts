@@ -28,9 +28,9 @@ export const getDyCookies = async (): Promise<string | undefined> => {
     const cookisUrl = "https://www.douyin.com/passport/general/login_guiding_strategy/?aid=6383";
     const { data } = await get<DyCookieResponse>({ url: cookisUrl, originaInfo: true });
     const pattern = /passport_csrf_token=(.*); Path/s;
-    const matchResult = data.headers["set-cookie"][0].match(pattern);
-    const cookieData = matchResult![1];
-    return cookieData;
+    const setCookie = data.headers?.["set-cookie"]?.[0] ?? "";
+    const matchResult = setCookie.match(pattern);
+    return matchResult?.[1];
   } catch (error) {
     console.error("获取抖音 Cookie 出错" + error);
     return undefined;
