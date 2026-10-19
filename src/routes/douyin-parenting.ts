@@ -6,6 +6,9 @@ import { fetchSpotsFromTikHub, fetchTopicsFromTikHub } from "./douyin-parenting-
 
 // v4：仅使用 TikHub 官方亲子垂类接口（创作热点 billboard_tag=19000、话题 billboard_tag=315）
 const CACHE_KEY = "douyin-parenting-data-v4";
+// 两路数据均失败时的冷却标记，避免故障期间反复触发付费调用
+const FAIL_COOLDOWN_KEY = "douyin-parenting-cooldown-v4";
+const FAIL_COOLDOWN_TTL = 600;
 
 const fetchFromDouyin = async (): Promise<ListItem[]> => {
   const [spotsRes, topicsRes] = await Promise.allSettled([
@@ -41,9 +44,14 @@ const getList = async (): Promise<RouterResType> => {
     };
   }
 
+  // 故障冷却：两路均失败后短时间内不再重复触发付费调用
+  if (await getCache(FAIL_COOLDOWN_KEY)) {
+    throw new Error("TikHub 数据源暂时不可用，已进入冷却");
+  }
+
   let data: ListItem[];
-  // 整榜缓存 30 分钟，兼顾新鲜度与 TikHub 计费
-  let ttl = Math.min(config.DOUYIN_PARENTING_CACHE_TTL, 1800);
+  // 整榜缓存 24 小时：每天最多一次付费刷新，由访问触发
+  let ttl = config.DOUYIN_PARENTING_CACHE_TTL;
 
   try {
     data = await fetchFromDouyin();
@@ -51,8 +59,17 @@ const getList = async (): Promise<RouterResType> => {
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     logger.warn(`⚠️ [douyin-parenting] failed (${errMsg}), falling back to topics`);
-    data = await fetchTopicsFromTikHub();
-    ttl = Math.min(ttl, 300);
+    try {
+      data = await fetchTopicsFromTikHub();
+      ttl = Math.min(ttl, 300);
+    } catch (fallbackError) {
+      await setCache(
+        FAIL_COOLDOWN_KEY,
+        { data: null, updateTime: new Date().toISOString() },
+        FAIL_COOLDOWN_TTL,
+      );
+      throw fallbackError;
+    }
   }
 
   const updateTime = new Date().toISOString();

@@ -21,18 +21,24 @@ const cache = new NodeCache({
   maxKeys: 100,
 });
 
-// init Redis client
-const redis = new Redis({
-  host: config.REDIS_HOST,
-  port: config.REDIS_PORT,
-  password: config.REDIS_PASSWORD,
-  db: config.REDIS_DB,
+const redisOptions = {
   maxRetriesPerRequest: 5,
   // 重试策略：最小延迟 50ms，最大延迟 2s
-  retryStrategy: (times) => Math.min(times * 50, 2000),
+  retryStrategy: (times: number) => Math.min(times * 50, 2000),
   // 仅在第一次建立连接
   lazyConnect: true,
-});
+};
+
+// init Redis client：优先用连接串（Upstash 的 rediss:// 会自动启用 TLS）
+const redis = config.REDIS_URL
+  ? new Redis(config.REDIS_URL, redisOptions)
+  : new Redis({
+      host: config.REDIS_HOST,
+      port: config.REDIS_PORT,
+      password: config.REDIS_PASSWORD,
+      db: config.REDIS_DB,
+      ...redisOptions,
+    });
 
 // Redis 是否可用
 let isRedisAvailable: boolean = false;
@@ -107,6 +113,7 @@ export const setCache = async (
   value: CacheData,
   ttl: number = config.CACHE_TTL,
 ): Promise<boolean> => {
+  await ensureRedisConnection();
   // 尝试写入 Redis
   if (isRedisAvailable && !Buffer.isBuffer(value?.data)) {
     try {

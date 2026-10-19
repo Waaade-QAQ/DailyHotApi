@@ -12,6 +12,7 @@ export type Config = {
   ALLOWED_HOST: string;
   USE_LOG_FILE: boolean;
   RSS_MODE: boolean;
+  REDIS_URL: string;
   REDIS_HOST: string;
   REDIS_PORT: number;
   REDIS_PASSWORD: string;
@@ -53,6 +54,8 @@ export const config: Config = {
   ALLOWED_HOST: getEnvVariable("ALLOWED_HOST") || "imsyy.top",
   USE_LOG_FILE: getBooleanEnvVariable("USE_LOG_FILE", true),
   RSS_MODE: getBooleanEnvVariable("RSS_MODE", false),
+  // Upstash 等托管 Redis 以连接串形式注入，优先使用
+  REDIS_URL: getEnvVariable("REDIS_URL") || getEnvVariable("KV_URL") || "",
   REDIS_HOST: getEnvVariable("REDIS_HOST") || "127.0.0.1",
   REDIS_PORT: getNumericEnvVariable("REDIS_PORT", 6379),
   REDIS_PASSWORD: getEnvVariable("REDIS_PASSWORD") || "",
@@ -60,5 +63,5 @@ export const config: Config = {
   ZHIHU_COOKIE: getEnvVariable("ZHIHU_COOKIE") || "",
   FILTER_WEIBO_ADVERTISEMENT: getBooleanEnvVariable("FILTER_WEIBO_ADVERTISEMENT", false),
   TIKHUB_API_KEY: getEnvVariable("TIKHUB_API_KEY") || "",
-  DOUYIN_PARENTING_CACHE_TTL: getNumericEnvVariable("DOUYIN_PARENTING_CACHE_TTL", 3600),
+  DOUYIN_PARENTING_CACHE_TTL: getNumericEnvVariable("DOUYIN_PARENTING_CACHE_TTL", 86400),
 };

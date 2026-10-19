@@ -44,6 +44,7 @@ import * as r_qq_news from "./qq-news.js";
 import * as r_sina_news from "./sina-news.js";
 import * as r_sina from "./sina.js";
 import * as r_smzdm from "./smzdm.js";
+import * as r_spring_festival from "./spring-festival.js";
 import * as r_sspai from "./sspai.js";
 import * as r_starrail from "./starrail.js";
 import * as r_thepaper from "./thepaper.js";
@@ -103,6 +104,7 @@ export const routesMap: Record<string, any> = {
   "sina-news": r_sina_news,
   "sina": r_sina,
   "smzdm": r_smzdm,
+  "spring-festival": r_spring_festival,
   "sspai": r_sspai,
   "starrail": r_starrail,
   "thepaper": r_thepaper,

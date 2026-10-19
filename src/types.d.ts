@@ -31,6 +31,13 @@ export interface RouterResType {
   message?: string;
 }
 
+// spring-festival: 年份与四天元数据
+export interface FestivalYearMeta {
+  year: number;
+  lunar: string;
+  days: { date: string; label: string }[];
+}
+
 // 路由数据
 export interface RouterData extends RouterResType {
   name: string;
@@ -40,6 +47,8 @@ export interface RouterData extends RouterResType {
   params?: Record<string, string | object>;
   total: number;
   link?: string;
+  // spring-festival: 年份列表，供前端渲染年份切换
+  meta?: { years: FestivalYearMeta[] };
 }
 
 // 请求类型

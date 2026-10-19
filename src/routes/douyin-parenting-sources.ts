@@ -4,8 +4,9 @@ import { get } from "../utils/getData.js";
 import { getTime } from "../utils/getTime.js";
 import { getCache, setCache } from "../utils/cache.js";
 
-// TikHub 创作热点词（每日快照）走 1h 独立缓存，控制计费
+// TikHub 两路数据各自独立缓存，控制计费
 const SPOT_CACHE_KEY = "douyin-parenting-spots-v4";
+const TOPIC_CACHE_KEY = "douyin-parenting-topics-v4";
 
 const searchUrl = (keyword: string) =>
   `https://www.douyin.com/search/${encodeURIComponent(keyword)}?type=general`;
@@ -89,7 +90,7 @@ export const fetchSpotsFromTikHub = async (): Promise<ListItem[]> => {
     await setCache(
       SPOT_CACHE_KEY,
       { data: items, updateTime: new Date().toISOString() },
-      3600,
+      config.DOUYIN_PARENTING_CACHE_TTL,
     );
   }
   return items;
@@ -100,6 +101,9 @@ export const fetchSpotsFromTikHub = async (): Promise<ListItem[]> => {
  */
 export const fetchTopicsFromTikHub = async (): Promise<ListItem[]> => {
   if (!config.TIKHUB_API_KEY) return [];
+  const cached = await getCache(TOPIC_CACHE_KEY);
+  if (cached) return cached.data as ListItem[];
+
   const url =
     "https://api.tikhub.io/api/v1/douyin/creator/fetch_creator_hot_topic_billboard?billboard_tag=315&order_key=1&time_filter=1";
   const result = await get<TikHubTopicResponse>({
@@ -109,7 +113,7 @@ export const fetchTopicsFromTikHub = async (): Promise<ListItem[]> => {
   });
   const raw = result.data?.data;
   const list = raw?.item_list || raw?.billboard_list || [];
-  return list.map((v, i): ListItem => {
+  const items = list.map((v, i): ListItem => {
     const id = v.item_id !== undefined ? String(v.item_id) : (v.query_id || `${i + 1}`);
     const title = v.title || v.word || `话题 ${i + 1}`;
     const hot = v.play_count ?? v.hot_score ?? 0;
@@ -129,4 +133,12 @@ export const fetchTopicsFromTikHub = async (): Promise<ListItem[]> => {
         : searchUrl(title),
     };
   });
+  if (items.length > 0) {
+    await setCache(
+      TOPIC_CACHE_KEY,
+      { data: items, updateTime: new Date().toISOString() },
+      config.DOUYIN_PARENTING_CACHE_TTL,
+    );
+  }
+  return items;
 };
